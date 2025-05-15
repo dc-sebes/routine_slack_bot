@@ -81,7 +81,7 @@ def handle_task_update(event, say):
 
             deadline = task_deadlines.get(task)
             if deadline:
-                deadline_dt = datetime.datetime.combine(ts.date(), deadline).replace(tzinfo=riga)
+                deadline_dt = riga.localize(datetime.datetime.combine(ts.date(), deadline))
                 print(f"⏱️ Сейчас: {ts.strftime('%H:%M:%S')} | Дедлайн для {task}: {deadline_dt.strftime('%H:%M:%S')}")
 
                 if ts > deadline_dt:
