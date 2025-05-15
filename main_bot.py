@@ -58,15 +58,14 @@ def handle_task_update(event, say):
 
  # Debug command to simulate cron task
     if "debug" in text.lower():
-     if "monday" in text.lower():
-         message = generate_message(day_override="Monday")
-     else:
-         message = generate_message()
+        debug_text = text.lower()
+        day_override = "Monday" if "monday" in debug_text else None
+        message = generate_message(day_override=day_override)
 
-    response = client.chat_postMessage(channel=CHANNEL_ID, text=message)
-    set_thread_ts(response["ts"])
-    say(text=f"<@{user}> отправлено сообщение с задачами (debug mode)", thread_ts=thread_ts)
-    return
+        response = client.chat_postMessage(channel=CHANNEL_ID, text=message)
+        set_thread_ts(response["ts"])
+        say(text=f"<@{user}> отправлено сообщение с задачами (debug mode)", thread_ts=response["ts"])
+        return
 
     match = re.search(r"(?i)(LPB|KYC-1|KYC-2|Statements).*done", text)
     if match:
