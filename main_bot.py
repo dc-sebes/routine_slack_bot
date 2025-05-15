@@ -5,6 +5,7 @@ import datetime
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_sdk.web import WebClient
+from task_tracker import set_thread_ts, record_task, get_thread_ts
 
 # ENV: SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_CHANNEL_ID
 app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
@@ -43,6 +44,7 @@ task_deadlines = {
     "LPB": datetime.time(hour=12),
     "KYC-1": datetime.time(hour=11),
     "KYC-2": datetime.time(hour=16),
+    "STATEMENTS": None,
 }
 
 @app.event("app_mention")
@@ -61,23 +63,34 @@ def handle_task_update(event, say):
      else:
          message = generate_message()
 
-     client.chat_postMessage(channel=CHANNEL_ID, text=message)
-     say(text=f"<@{user}> отправлено сообщение с задачами (debug mode)", thread_ts=thread_ts)
-     return
+    response = client.chat_postMessage(channel=CHANNEL_ID, text=message)
+    set_thread_ts(response["ts"])
+    say(text=f"<@{user}> отправлено сообщение с задачами (debug mode)", thread_ts=thread_ts)
+    return
 
     match = re.search(r"(?i)(LPB|KYC-1|KYC-2|Statements).*done", text)
     if match:
-        task = match.group(1).upper()
-        deadline = task_deadlines.get(task)
-        if deadline:
-                    deadline_dt = datetime.datetime.combine(ts.date(), deadline).replace(tzinfo=riga)
-                    print(f"⏱️ Сейчас: {ts.strftime('%H:%M:%S')} | Дедлайн для {task}: {deadline_dt.strftime('%H:%M:%S')}")
-                    if ts > deadline_dt:
-                        say(text=f"<@{user}> {task} было сделано поздно!", thread_ts=thread_ts)
-                    else:
-                        client.reactions_add(channel=event["channel"], timestamp=event["ts"], name="white_check_mark")
-        else:
-         say(text=f"<@{user}> я не понял, о какой задаче речь 🤔. Напиши, например: `@bot LPB done`", thread_ts=thread_ts)
+            task = match.group(1).upper()
+            ok, msg = record_task(task, user)
+            if not ok:
+                say(text=f"<@{user}> {msg}", thread_ts=thread_ts)
+                return
+
+            if task == "STATEMENTS":
+                client.reactions_add(channel=event["channel"], timestamp=event["ts"], name="white_check_mark")
+                return
+
+            deadline = task_deadlines.get(task)
+            if deadline:
+                deadline_dt = datetime.datetime.combine(ts.date(), deadline).replace(tzinfo=riga)
+                print(f"⏱️ Сейчас: {ts.strftime('%H:%M:%S')} | Дедлайн для {task}: {deadline_dt.strftime('%H:%M:%S')}")
+
+                if ts > deadline_dt:
+                    say(text=f"<@{user}> {task} было сделано поздно!", thread_ts=thread_ts)
+                else:
+                    client.reactions_add(channel=event["channel"], timestamp=event["ts"], name="white_check_mark")
+    else:
+        say(text=f"<@{user}> я не понял, о какой задаче речь 🤔. Напиши, например: `@bot LPB done`", thread_ts=thread_ts)
 
 
 
