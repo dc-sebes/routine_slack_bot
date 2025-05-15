@@ -51,7 +51,8 @@ def handle_task_update(event, say):
     text = event.get("text", "")
     user = event.get("user")
     thread_ts = event.get("thread_ts") or event.get("ts")
-    ts = datetime.datetime.now(pytz.timezone("Europe/Riga"))
+    riga = pytz.timezone("Europe/Riga")
+    ts = datetime.datetime.now(riga)
 
  # Debug command to simulate cron task
     if "debug" in text.lower():
@@ -69,7 +70,7 @@ def handle_task_update(event, say):
         task = match.group(1).upper()
         deadline = task_deadlines.get(task)
         if deadline:
-                    deadline_dt = datetime.datetime.combine(ts.date(), deadline)
+                    deadline_dt = datetime.datetime.combine(ts.date(), deadline).replace(tzinfo=riga)
                     print(f"⏱️ Сейчас: {ts.strftime('%H:%M:%S')} | Дедлайн для {task}: {deadline_dt.strftime('%H:%M:%S')}")
                     if ts > deadline_dt:
                         say(text=f"<@{user}> {task} было сделано поздно!", thread_ts=thread_ts)
