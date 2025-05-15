@@ -68,17 +68,14 @@ def handle_task_update(event, say):
         task = match.group(1).upper()
         deadline = task_deadlines.get(task)
         if deadline:
-            deadline_dt = datetime.datetime.combine(ts.date(), deadline)
-            if ts > deadline_dt:
-                say(text=f"<@{user}> {task} было сделано поздно!", thread_ts=thread_ts)
-            else:
-                client.reactions_add(
-                    channel=event["channel"],
-                    timestamp=event["ts"],
-                    name="white_check_mark"
-                )
-    else:
-        say(text=f"<@{user}> я не понял, о какой задаче речь 🤔. Напиши, например: `@bot LPB done`", thread_ts=thread_ts)
+                    deadline_dt = datetime.datetime.combine(ts.date(), deadline)
+                    print(f"⏱️ Сейчас: {ts.strftime('%H:%M:%S')} | Дедлайн для {task}: {deadline_dt.strftime('%H:%M:%S')}")
+                    if ts > deadline_dt:
+                        say(text=f"<@{user}> {task} было сделано поздно!", thread_ts=thread_ts)
+                    else:
+                        client.reactions_add(channel=event["channel"], timestamp=event["ts"], name="white_check_mark")
+        else:
+         say(text=f"<@{user}> я не понял, о какой задаче речь 🤔. Напиши, например: `@bot LPB done`", thread_ts=thread_ts)
 
 
 
