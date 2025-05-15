@@ -1,3 +1,4 @@
+import pytz
 import os
 import re
 import datetime
@@ -50,7 +51,7 @@ def handle_task_update(event, say):
     text = event.get("text", "")
     user = event.get("user")
     thread_ts = event.get("thread_ts") or event.get("ts")
-    ts = datetime.datetime.now()
+    ts = datetime.datetime.now(pytz.timezone("Europe/Riga"))
 
  # Debug command to simulate cron task
     if "debug" in text.lower():
