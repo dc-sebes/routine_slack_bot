@@ -41,6 +41,7 @@ task_deadlines = {
 
 @app.event("app_mention")
 def handle_task_update(event, say):
+    print("👀 BOT GOT MENTION:", event)  # ← отладка
     text = event.get("text", "")
     user = event.get("user")
     thread_ts = event.get("thread_ts") or event.get("ts")
