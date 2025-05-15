@@ -11,26 +11,31 @@ client = WebClient(token=os.environ.get("SLACK_BOT_TOKEN"))
 CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
 
 #debug
-def generate_message():
+def generate_message(day_override=None):
     today = datetime.datetime.now()
-    day_name = today.strftime('%A')
-    date_str = today.strftime('%d %B (%A)')
+
+    if day_override:
+        day_name = day_override.capitalize()
+        fake_date = today.strftime('%d %B') + f" ({day_name})"
+    else:
+        day_name = today.strftime('%A')
+        fake_date = today.strftime('%d %B (%A)')
 
     if day_name == "Monday":
         tasks = [
-            "- [ ] Statements - выгрузки",
+            "- [ ] Statements",
             "- [ ] LPB до 12:00",
             "- [ ] Проверка KYC-1 до 11:00",
             "- [ ] Проверка KYC-2 после 15:00"
         ]
     else:
         tasks = [
-            "- [ ] Проверка счетов до 12:00",
-            "- [ ] Проверка KYC до 11:00",
-            "- [ ] Проверка KYC после 15:00"
+            "- [ ] LPB до 12:00",
+            "- [ ] Проверка KYC-1 до 11:00",
+            "- [ ] Проверка KYC-2 после 15:00"
         ]
 
-    header = f"\ud83c\udf93 Routine tasks for *{date_str}*"
+    header = f"🎓 Routine tasks for *{fake_date}*"
     return header + "\n\n" + "\n".join(tasks)
 
 task_deadlines = {
@@ -49,12 +54,16 @@ def handle_task_update(event, say):
 
  # Debug command to simulate cron task
     if "debug" in text.lower():
-        message = generate_message()
-        client.chat_postMessage(channel=CHANNEL_ID, text=message)
-        say(text=f"<@{user}> сообщение с задачами отправлено (debug mode)", thread_ts=thread_ts)
-        return
+     if "monday" in text.lower():
+         message = generate_message(day_override="Monday")
+     else:
+         message = generate_message()
 
-    match = re.search(r"(?i)(LPB|KYC-1|KYC-2).*done", text)
+     client.chat_postMessage(channel=CHANNEL_ID, text=message)
+     say(text=f"<@{user}> отправлено сообщение с задачами (debug mode)", thread_ts=thread_ts)
+     return
+
+    match = re.search(r"(?i)(LPB|KYC-1|KYC-2|Statements).*done", text)
     if match:
         task = match.group(1).upper()
         deadline = task_deadlines.get(task)
