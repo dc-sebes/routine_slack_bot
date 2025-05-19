@@ -1,18 +1,22 @@
 import os
 import json
 import datetime
+import redis
 
-STATE_FILE = "/tmp/slack_routine_state.json"
+# Подключение к Redis по переменной окружения
+redis_url = os.environ.get("REDIS_URL")
+r = redis.Redis.from_url(redis_url)
+
+REDIS_KEY = "slack_routine_state"
 
 def load_state():
-    if os.path.exists(STATE_FILE):
-        with open(STATE_FILE, "r") as f:
-            return json.load(f)
+    data = r.get(REDIS_KEY)
+    if data:
+        return json.loads(data)
     return {}
 
 def save_state(state):
-    with open(STATE_FILE, "w") as f:
-        json.dump(state, f)
+    r.set(REDIS_KEY, json.dumps(state))
 
 def set_thread_ts(thread_ts):
     state = load_state()

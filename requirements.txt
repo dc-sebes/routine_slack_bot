@@ -1,3 +1,4 @@
 slack-bolt==1.18.0
 slack-sdk==3.21.3
 pytz>=2023.3
+redis==5.0.4
