@@ -43,7 +43,7 @@ def generate_message(day_override=None):
 task_deadlines = {
     "LPB": datetime.time(hour=12),
     "KYC-1": datetime.time(hour=11),
-    "KYC-2": datetime.time(hour=16),
+    "KYC-2": datetime.time(hour=18),
     "STATEMENTS": None,
 }
 
@@ -66,6 +66,7 @@ def handle_task_update(event, say):
         set_thread_ts(response["ts"])
         say(text=f"<@{user}> отправлено сообщение с задачами (debug mode)", thread_ts=response["ts"])
         return
+ #########################################
 
     match = re.search(r"(?i)(LPB|KYC-1|KYC-2|Statements).*done", text)
     if match:

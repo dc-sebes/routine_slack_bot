@@ -1,6 +1,7 @@
 import os
 import datetime
 from slack_sdk import WebClient
+from task_tracker import set_thread_ts
 
 client = WebClient(token=os.environ.get("SLACK_BOT_TOKEN"))
 CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
@@ -32,3 +33,5 @@ if __name__ == "__main__":
     if today.weekday() < 5:  # 0–4: Monday–Friday
         message = generate_message()
         client.chat_postMessage(channel=CHANNEL_ID, text=message)
+        response = client.chat_postMessage(channel=CHANNEL_ID, text=message)
+        set_thread_ts(response["ts"])
