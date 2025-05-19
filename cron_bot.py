@@ -32,6 +32,5 @@ if __name__ == "__main__":
     today = datetime.datetime.today()
     if today.weekday() < 5:  # 0–4: Monday–Friday
         message = generate_message()
-        client.chat_postMessage(channel=CHANNEL_ID, text=message)
         response = client.chat_postMessage(channel=CHANNEL_ID, text=message)
         set_thread_ts(response["ts"])
