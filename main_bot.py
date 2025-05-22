@@ -43,7 +43,7 @@ def generate_message(day_override=None):
 task_deadlines = {
     "LPB": datetime.time(hour=12),
     "KYC-1": datetime.time(hour=11),
-    "KYC-2": datetime.time(hour=18),
+    "KYC-2": datetime.time(hour=21),
     "STATEMENTS": None,
 }
 
