@@ -11,7 +11,7 @@ from redis_bot import (
 )
 
 # ENV: SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_CHANNEL_ID
-app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
+app = App(token=os.environ.get("SLACK_APP_TOKEN"))
 client = WebClient(token=os.environ.get("SLACK_BOT_TOKEN"))
 CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
 
