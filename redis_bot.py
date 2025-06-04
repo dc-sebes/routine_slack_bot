@@ -96,25 +96,25 @@ def get_tasks_for_day(day_name):
     return tasks
 
 def format_task_line(task):
-    #Форматировать строку задачи для Slack
+    """Форматировать строку задачи для Slack"""
     name = task.get("name", "")
     deadline = task.get("deadline", "")
     asana_url = task.get("asana_url", "")
     comments = task.get("comments", "")
 
-    # Базовая строка с чекбоксом
+    # Базовая строка с чекбоксом и эмодзи времени
     if deadline:
-        task_line = f"- [ ] {name} до {deadline}"
+        task_line = f"- [ ] **{name}** ⏰ до {deadline}"
     else:
-        task_line = f"- [ ] {name}"
+        task_line = f"- [ ] **{name}**"
 
-    # Добавляем ссылку на Asana, если есть
+    # Добавляем ссылку на Asana (скрытую за текстом)
     if asana_url:
-        task_line += f" ([Asana]({asana_url}))"
+        task_line += f" • <{asana_url}|📋 Asana>"
 
-    # Добавляем комментарии, если есть
+    # Добавляем комментарии с эмодзи
     if comments:
-        task_line += f" _{comments}_"
+        task_line += f"\n   💬 _{comments}_"
 
     return task_line
 
