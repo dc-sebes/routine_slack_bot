@@ -7,7 +7,7 @@ client = WebClient(token=os.environ.get("SLACK_BOT_TOKEN"))
 CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
 
 # Захардкоженная команда для тегинга
-TEAM_MENTION = "<@S07BD1P55GT>"  # Замените на свой team ID
+TEAM_MENTION = "<!subteam^S07BD1P55GT|@sup>"
 
 def get_incomplete_tasks():
     #Получить невыполненные задачи с учетом времени напоминания
