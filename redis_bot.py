@@ -96,7 +96,7 @@ def get_tasks_for_day(day_name):
     return tasks
 
 def format_task_line(task):
-    """Форматировать строку задачи для Slack"""
+    #Форматировать строку задачи для Slack
     name = task.get("name", "")
     deadline = task.get("deadline", "")
     asana_url = task.get("asana_url", "")
