@@ -1,5 +1,6 @@
 import os
 import datetime
+import pytz
 from slack_sdk import WebClient
 from redis_bot import get_tasks_for_day, get_completed_tasks, get_thread_ts
 
@@ -11,7 +12,8 @@ TEAM_MENTION = "<!subteam^S07BD1P55GT|@sup>"
 
 def get_incomplete_tasks():
     #Получить невыполненные задачи с учетом времени напоминания
-    today = datetime.datetime.now()
+    riga = pytz.timezone("Europe/Riga")
+    today = datetime.datetime.now(riga)
     day_name = today.strftime('%A')
     current_hour = today.hour
 
@@ -65,7 +67,8 @@ def get_incomplete_tasks():
 
 def format_reminder_message():
     #Форматировать сообщение-напоминание
-    today = datetime.datetime.now()
+    riga = pytz.timezone("Europe/Riga")
+    today = datetime.datetime.now(riga)
     current_time = today.strftime('%H:%M')
     date_str = today.strftime('%d %B (%A)')
 
@@ -107,7 +110,7 @@ def format_reminder_message():
     return "\n".join(message_parts)
 
 def send_reminder():
-    """Отправить напоминание в Slack"""
+    #Отправить напоминание в Slack
     message = format_reminder_message()
 
     if not message:
