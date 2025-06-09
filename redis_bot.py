@@ -1,41 +1,71 @@
-import os
 import json
 import datetime
 import redis
 import re
+import logging
+from typing import Dict, List, Optional, Tuple, Any
+from config import Config
 
-# Подключение к Redis по переменной окружения
-redis_url = os.environ.get("REDIS_URL")
-r = redis.Redis.from_url(redis_url)
+# Setup logging
+logger = logging.getLogger(__name__)
 
-# Ключи Redis
-SLACK_ROUTINE_STATE = "slack_routine_state"
-DEBUG_ROUTINE_STATE = "debug_routine_state"
-TASK_BASE = "task_base"
+# Redis connection with error handling
+try:
+    r = redis.Redis.from_url(Config.REDIS_URL)
+    # Test connection
+    r.ping()
+    logger.info("Successfully connected to Redis")
+except redis.ConnectionError as e:
+    logger.error(f"Failed to connect to Redis: {e}")
+    raise
+except Exception as e:
+    logger.error(f"Unexpected error connecting to Redis: {e}")
+    raise
 
-def load_state(debug_mode=False):
-    #Загрузить состояние routine (обычное или debug)
-    key = DEBUG_ROUTINE_STATE if debug_mode else SLACK_ROUTINE_STATE
-    data = r.get(key)
-    if data:
-        return json.loads(data)
-    return {}
+def load_state(debug_mode: bool = False) -> Dict[str, Any]:
+    #Load routine state (normal or debug mode).
+    try:
+        key = Config.DEBUG_ROUTINE_STATE if debug_mode else Config.SLACK_ROUTINE_STATE
+        data = r.get(key)
+        if data:
+            return json.loads(data)
+        return {}
+    except (redis.RedisError, json.JSONDecodeError) as e:
+        logger.error(f"Error loading state (debug_mode={debug_mode}): {e}")
+        return {}
 
-def save_state(state, debug_mode=False):
-    #Сохранить состояние routine (обычное или debug)
-    key = DEBUG_ROUTINE_STATE if debug_mode else SLACK_ROUTINE_STATE
-    r.set(key, json.dumps(state))
+def save_state(state: Dict[str, Any], debug_mode: bool = False) -> bool:
+    #Save routine state (normal or debug mode).
+    try:
+        key = Config.DEBUG_ROUTINE_STATE if debug_mode else Config.SLACK_ROUTINE_STATE
+        r.set(key, json.dumps(state))
+        logger.debug(f"State saved successfully (debug_mode={debug_mode})")
+        return True
+    except (redis.RedisError, json.JSONEncodeError) as e:
+        logger.error(f"Error saving state (debug_mode={debug_mode}): {e}")
+        return False
 
-def load_task_base():
-    #Загрузить базу задач из Redis
-    data = r.get(TASK_BASE)
-    if data:
-        return json.loads(data)
-    return {}
+def load_task_base() -> Dict[str, Any]:
+    #Load task base from Redis.
+    try:
+        data = r.get(Config.TASK_BASE)
+        if data:
+            return json.loads(data)
+        logger.warning("Task base is empty or not found")
+        return {}
+    except (redis.RedisError, json.JSONDecodeError) as e:
+        logger.error(f"Error loading task base: {e}")
+        return {}
 
-def save_task_base(task_base):
-    #Сохранить базу задач в Redis
-    r.set(TASK_BASE, json.dumps(task_base))
+def save_task_base(task_base: Dict[str, Any]) -> bool:
+    #Save task base to Redis.
+    try:
+        r.set(Config.TASK_BASE, json.dumps(task_base))
+        logger.debug("Task base saved successfully")
+        return True
+    except (redis.RedisError, json.JSONEncodeError) as e:
+        logger.error(f"Error saving task base: {e}")
+        return False
 
 def set_thread_ts(thread_ts, debug_mode=False):
     #Установить thread_ts для нового дня
