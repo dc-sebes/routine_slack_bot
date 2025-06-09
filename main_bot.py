@@ -3,7 +3,6 @@ import datetime
 from typing import Dict, Any, Optional
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
-from slack_sdk.web import WebClient
 from config import Config
 from redis_bot import (
     set_thread_ts, record_task, get_thread_ts,
@@ -14,28 +13,23 @@ from redis_bot import (
 logger = Config.setup_logging()
 Config.validate_required_env_vars()
 
-# Initialize Slack app with Bot Token for Socket Mode
-app = App(token=Config.SLACK_APP_TOKEN)
-client = WebClient(token=Config.SLACK_BOT_TOKEN)
+# ВАЖНО: Используем Bot Token для App, App Token для Socket Mode
+app = App(token=Config.SLACK_BOT_TOKEN)
 
 def generate_message(day_override: Optional[str] = None) -> str:
-    #Generate message for debug mode.
+    """Generate message for debug mode."""
     try:
-        # Get message from Redis with debug mode support
         message = generate_message_from_redis(day_override=day_override, debug_mode=True)
-
-        # Empty Redis
         if "_Нет задач на сегодня_" in message:
             logger.warning("Tasks not found in Redis, using fallback logic")
         return message
-
     except Exception as e:
         logger.error(f"Error generating debug message: {e}")
         return "❌ Error generating debug message"
 
 @app.event("app_mention")
 def handle_task_update(event: Dict[str, Any], say, client) -> None:
-    #Handle app mentions for task completion and debug commands.
+    """Handle app mentions for task completion and debug commands."""
     try:
         logger.info(f"Bot mentioned: {event.get('user')} - {event.get('text', '')}")
 
@@ -52,19 +46,25 @@ def handle_task_update(event: Dict[str, Any], say, client) -> None:
                 day_override = "Monday" if "monday" in debug_text else None
                 message = generate_message(day_override=day_override)
 
-                # Use client from Bolt context instead of separate WebClient
-                response = client.chat_postMessage(channel=Config.SLACK_CHANNEL_ID, text=message)
-                # Use debug mode for thread_ts
+                # Используем ТОЛЬКО client из контекста Bolt
+                response = client.chat_postMessage(
+                    channel=Config.SLACK_CHANNEL_ID,
+                    text=message
+                )
                 set_thread_ts(response["ts"], debug_mode=True)
-                say(text=f"<@{user}> sent task message (debug mode)", thread_ts=response["ts"])
+
+                # Используем say для ответа в том же треде
+                say(f"<@{user}> sent task message (debug mode)")
                 logger.info(f"Debug message sent by user {user}")
                 return
+
             except Exception as e:
                 logger.error(f"Error handling debug command: {e}")
-                say(text=f"<@{user}> ❌ Error sending debug message", thread_ts=thread_ts)
+                # Простой ответ без thread_ts при ошибке
+                say(f"<@{user}> ❌ Error sending debug message")
                 return
 
-        # Определяем, это debug режим или обычный
+        # Определяем debug режим
         debug_mode = False
         debug_thread_ts = get_thread_ts(debug_mode=True)
 
@@ -76,10 +76,10 @@ def handle_task_update(event: Dict[str, Any], say, client) -> None:
         if task:
             ok, msg = record_task(task, user, debug_mode=debug_mode)
             if not ok:
-                say(text=f"<@{user}> {msg}", thread_ts=thread_ts)
+                say(f"<@{user}> {msg}")
                 return
 
-            # Получаем дедлайны из Redis
+            # Проверяем дедлайны
             task_deadlines = get_task_deadlines()
             deadline = task_deadlines.get(task)
 
@@ -89,21 +89,33 @@ def handle_task_update(event: Dict[str, Any], say, client) -> None:
 
                 if ts > deadline_dt:
                     prefix = "🔧 DEBUG: " if debug_mode else ""
-                    say(text=f"{prefix}<@{user}> {task} было сделано поздно!", thread_ts=thread_ts)
+                    say(f"{prefix}<@{user}> {task} было сделано поздно!")
                 else:
-                    # Use client from Bolt context
-                    client.reactions_add(channel=event["channel"], timestamp=event["ts"], name="white_check_mark")
+                    # Добавляем реакцию
+                    client.reactions_add(
+                        channel=event["channel"],
+                        timestamp=event["ts"],
+                        name="white_check_mark"
+                    )
             else:
-                # Для задач без дедлайна просто ставим галочку
-                client.reactions_add(channel=event["channel"], timestamp=event["ts"], name="white_check_mark")
+                # Задачи без дедлайна - просто галочка
+                client.reactions_add(
+                    channel=event["channel"],
+                    timestamp=event["ts"],
+                    name="white_check_mark"
+                )
         else:
             prefix = "🔧 DEBUG: " if debug_mode else ""
-            say(text=f"{prefix}<@{user}> я не понял, о какой задаче речь 🤔. Напиши, например: `@bot LPB done`", thread_ts=thread_ts)
+            say(f"{prefix}<@{user}> я не понял, о какой задаче речь 🤔. Напиши, например: `@bot LPB done`")
 
     except Exception as e:
         logger.error(f"Error in handle_task_update: {e}")
-        say(text=f"<@{user}> ❌ Произошла ошибка при обработке команды", thread_ts=thread_ts)
-
+        # Максимально простой ответ при критической ошибке
+        try:
+            say(f"<@{user}> ❌ Произошла ошибка при обработке команды")
+        except:
+            logger.error("Failed to send error message to user")
 
 if __name__ == "__main__":
+    # ВАЖНО: App Token для Socket Mode Handler
     SocketModeHandler(app, Config.SLACK_APP_TOKEN).start()
