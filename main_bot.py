@@ -14,7 +14,7 @@ from redis_bot import (
 logger = Config.setup_logging()
 Config.validate_required_env_vars()
 
-# Initialize Slack app
+# Initialize Slack app with Bot Token for Socket Mode
 app = App(token=Config.SLACK_APP_TOKEN)
 client = WebClient(token=Config.SLACK_BOT_TOKEN)
 
@@ -34,7 +34,7 @@ def generate_message(day_override: Optional[str] = None) -> str:
         return "❌ Error generating debug message"
 
 @app.event("app_mention")
-def handle_task_update(event: Dict[str, Any], say) -> None:
+def handle_task_update(event: Dict[str, Any], say, client) -> None:
     #Handle app mentions for task completion and debug commands.
     try:
         logger.info(f"Bot mentioned: {event.get('user')} - {event.get('text', '')}")
@@ -52,6 +52,7 @@ def handle_task_update(event: Dict[str, Any], say) -> None:
                 day_override = "Monday" if "monday" in debug_text else None
                 message = generate_message(day_override=day_override)
 
+                # Use client from Bolt context instead of separate WebClient
                 response = client.chat_postMessage(channel=Config.SLACK_CHANNEL_ID, text=message)
                 # Use debug mode for thread_ts
                 set_thread_ts(response["ts"], debug_mode=True)
@@ -63,13 +64,13 @@ def handle_task_update(event: Dict[str, Any], say) -> None:
                 say(text=f"<@{user}> ❌ Error sending debug message", thread_ts=thread_ts)
                 return
 
-        # Определяем, это debug режим или обычный (ПЕРЕНЕСЕНО ВНУТРЬ TRY)
+        # Определяем, это debug режим или обычный
         debug_mode = False
         debug_thread_ts = get_thread_ts(debug_mode=True)
 
         if thread_ts == debug_thread_ts:
             debug_mode = True
-            print("🔧 DEBUG MODE: используем debug_routine_state")
+            logger.info("🔧 DEBUG MODE: используем debug_routine_state")
 
         task = find_task_in_text(text)
         if task:
@@ -84,12 +85,13 @@ def handle_task_update(event: Dict[str, Any], say) -> None:
 
             if deadline:
                 deadline_dt = riga.localize(datetime.datetime.combine(ts.date(), deadline))
-                print(f"⏱️ Сейчас: {ts.strftime('%H:%M:%S')} | Дедлайн для {task}: {deadline_dt.strftime('%H:%M:%S')}")
+                logger.info(f"⏱️ Сейчас: {ts.strftime('%H:%M:%S')} | Дедлайн для {task}: {deadline_dt.strftime('%H:%M:%S')}")
 
                 if ts > deadline_dt:
                     prefix = "🔧 DEBUG: " if debug_mode else ""
                     say(text=f"{prefix}<@{user}> {task} было сделано поздно!", thread_ts=thread_ts)
                 else:
+                    # Use client from Bolt context
                     client.reactions_add(channel=event["channel"], timestamp=event["ts"], name="white_check_mark")
             else:
                 # Для задач без дедлайна просто ставим галочку
