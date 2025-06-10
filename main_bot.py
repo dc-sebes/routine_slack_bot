@@ -29,7 +29,7 @@ def generate_message(day_override: Optional[str] = None) -> str:
 
 @app.event("app_mention")
 def handle_task_update(event: Dict[str, Any], say, client) -> None:
-    """Handle app mentions for task completion and debug commands."""
+    #Handle app mentions for task completion and debug commands.
     try:
         logger.info(f"Bot mentioned: {event.get('user')} - {event.get('text', '')}")
 
@@ -46,37 +46,56 @@ def handle_task_update(event: Dict[str, Any], say, client) -> None:
                 day_override = "Monday" if "monday" in debug_text else None
                 message = generate_message(day_override=day_override)
 
-                # Используем ТОЛЬКО client из контекста Bolt
+                # Создаем новое сообщение с задачами
                 response = client.chat_postMessage(
                     channel=Config.SLACK_CHANNEL_ID,
                     text=message
                 )
                 set_thread_ts(response["ts"], debug_mode=True)
 
-                # Используем say для ответа в том же треде
-                say(f"<@{user}> sent task message (debug mode)")
+                say(
+                    text=f"<@{user}> sent task message (debug mode)",
+                    thread_ts=response["ts"]  # В треде нового сообщения
+                )
                 logger.info(f"Debug message sent by user {user}")
                 return
 
             except Exception as e:
                 logger.error(f"Error handling debug command: {e}")
-                # Простой ответ без thread_ts при ошибке
-                say(f"<@{user}> ❌ Error sending debug message")
+                # Отвечаем в исходном треде
+                say(
+                    text=f"<@{user}> ❌ Error sending debug message",
+                    thread_ts=thread_ts
+                )
                 return
 
-        # Определяем debug режим
+        # Определяем debug режим по thread_ts
         debug_mode = False
+        production_thread_ts = get_thread_ts(debug_mode=False)
         debug_thread_ts = get_thread_ts(debug_mode=True)
 
         if thread_ts == debug_thread_ts:
             debug_mode = True
             logger.info("🔧 DEBUG MODE: используем debug_routine_state")
+        elif thread_ts == production_thread_ts:
+            debug_mode = False
+            logger.info("📋 PRODUCTION MODE: используем slack_routine_state")
+        else:
+            # Если не в известном треде, используем production по умолчанию
+            debug_mode = False
+            # Используем production thread_ts для ответа
+            if production_thread_ts:
+                thread_ts = production_thread_ts
+            logger.info("📋 DEFAULT MODE: используем slack_routine_state")
 
         task = find_task_in_text(text)
         if task:
             ok, msg = record_task(task, user, debug_mode=debug_mode)
             if not ok:
-                say(f"<@{user}> {msg}")
+                say(
+                    text=f"<@{user}> {msg}",
+                    thread_ts=thread_ts
+                )
                 return
 
             # Проверяем дедлайны
@@ -89,9 +108,11 @@ def handle_task_update(event: Dict[str, Any], say, client) -> None:
 
                 if ts > deadline_dt:
                     prefix = "🔧 DEBUG: " if debug_mode else ""
-                    say(f"{prefix}<@{user}> {task} было сделано поздно!")
+                    say(
+                        text=f"{prefix}<@{user}> {task} было сделано поздно!",
+                        thread_ts=thread_ts
+                    )
                 else:
-                    # Добавляем реакцию
                     client.reactions_add(
                         channel=event["channel"],
                         timestamp=event["ts"],
@@ -106,16 +127,20 @@ def handle_task_update(event: Dict[str, Any], say, client) -> None:
                 )
         else:
             prefix = "🔧 DEBUG: " if debug_mode else ""
-            say(f"{prefix}<@{user}> я не понял, о какой задаче речь 🤔. Напиши, например: `@bot LPB done`")
+            say(
+                text=f"{prefix}<@{user}> я не понял, о какой задаче речь 🤔. Напиши, например: `@bot LPB done`",
+                thread_ts=thread_ts
+            )
 
     except Exception as e:
         logger.error(f"Error in handle_task_update: {e}")
-        # Максимально простой ответ при критической ошибке
         try:
-            say(f"<@{user}> ❌ Произошла ошибка при обработке команды")
+            say(
+                text=f"<@{user}> ❌ Произошла ошибка при обработке команды",
+                thread_ts=thread_ts
+            )
         except:
             logger.error("Failed to send error message to user")
 
 if __name__ == "__main__":
-    # ВАЖНО: App Token для Socket Mode Handler
     SocketModeHandler(app, Config.SLACK_APP_TOKEN).start()
