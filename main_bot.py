@@ -1,5 +1,6 @@
 import pytz
 import datetime
+import re
 from typing import Dict, Any, Optional
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
@@ -168,19 +169,29 @@ def handle_set_fin_duty(ack, command, say):
                 say("❌ Ошибка при снятии назначения")
             return
 
-        # Извлекаем user ID из упоминания (@UXXXXXXX)
-        import re
-        user_mention_match = re.search(r'<@([UW][A-Z0-9]+)>', text)
+        #Извлекаем user ID из упоминания (@UXXXXXXX)
+        user_mention_patterns = [
+            r'<@([UW][A-Z0-9]+)(?:\|[^>]+)?>', # <@U1234567890> или <@U1234567890|username>
+            r'@([UW][A-Z0-9]+)',              # @U1234567890
+            r'([UW][A-Z0-9]{8,})'             # просто U1234567890
+        ]
 
-        if user_mention_match:
-            mentioned_user_id = user_mention_match.group(1)
+        mentioned_user_id = None
+        for pattern in user_mention_patterns:
+            match = re.search(pattern, text)
+            if match:
+                mentioned_user_id = match.group(1)
+                logger.info(f"Found user ID: {mentioned_user_id}")
+                break
 
+        if mentioned_user_id:
             if set_task_assignment(task_name, mentioned_user_id):
                 say(f"✅ Пользователь <@{mentioned_user_id}> назначен на задачу *{task_name}*")
             else:
                 say("❌ Ошибка при назначении пользователя")
         else:
-            say("❌ Не удалось найти упоминание пользователя. Используйте: `/set-fin-duty @username`")
+            logger.warning(f"Could not parse user mention from: '{text}'")
+            say(f"❌ Не удалось найти упоминание пользователя в '{text}'. Используйте: `/set-fin-duty @username`")
 
     except Exception as e:
         logger.error(f"Error in handle_set_fin_duty: {e}")
