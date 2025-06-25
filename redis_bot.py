@@ -128,25 +128,36 @@ def get_tasks_for_day(day_name):
     return tasks
 
 def format_task_line(task):
-    #Форматировать строку задачи для Slack
+    #Форматировать строку задачи для Slack с учетом назначений
     name = task.get("name", "")
     deadline = task.get("deadline", "")
     asana_url = task.get("asana_url", "")
     comments = task.get("comments", "")
 
-    # Базовая строка с чекбоксом и эмодзи времени
-    if deadline:
-        task_line = f"- [ ] *{name}* до {deadline}"
+    # Проверяем, есть ли назначенный пользователь на эту задачу
+    assigned_user = get_task_assignment(name)
+
+    # Базовая строка с чекбоксом и назначенным пользователем
+    if assigned_user:
+        # Если есть назначенный пользователь, добавляем его в начало
+        if deadline:
+            task_line = f"- [ ] [<@{assigned_user}>] *{name}* до {deadline}"
+        else:
+            task_line = f"- [ ] [<@{assigned_user}>] *{name}*"
     else:
-        task_line = f"- [ ] *{name}*"
+        # Обычная строка без назначения
+        if deadline:
+            task_line = f"- [ ] *{name}* до {deadline}"
+        else:
+            task_line = f"- [ ] *{name}*"
 
     # Добавляем ссылку на Asana в Slack-специфичном формате
     if asana_url:
         task_line += f" • <{asana_url}|Asana>"
 
-    # Добавляем комментарии на новой строке с отступом
+    # Добавляем комментарии в конце строки с отступом
     if comments:
-        task_line += f"\n    _{comments}_"
+        task_line += f"     _{comments}_"
 
     return task_line
 
