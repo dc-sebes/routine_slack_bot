@@ -6,7 +6,8 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 from config import Config
 from redis_bot import (
     set_thread_ts, record_task, get_thread_ts,
-    generate_message_from_redis, get_task_deadlines, find_task_in_text
+    generate_message_from_redis, get_task_deadlines, find_task_in_text,
+    set_task_assignment, find_task_by_pattern  # Новые функции
 )
 
 # Setup logging and validate config
@@ -141,6 +142,49 @@ def handle_task_update(event: Dict[str, Any], say, client) -> None:
             )
         except:
             logger.error("Failed to send error message to user")
+
+@app.command("/set-fin-duty")
+def handle_set_fin_duty(ack, command, say):
+    #Обработчик команды /set-fin-duty
+    ack()
+
+    try:
+        user_id = command.get("user_id")
+        text = command.get("text", "").strip()
+
+        # Ищем задачу, содержащую "fin-duty" или "fin duty"
+        task_name = find_task_by_pattern("fin")
+
+        if not task_name:
+            say("❌ Задача с 'fin' в названии не найдена в системе")
+            return
+
+        # Парсим команду
+        if not text:
+            # Пустая команда - снимаем назначение
+            if set_task_assignment(task_name):
+                say(f"✅ Назначение с задачи *{task_name}* снято")
+            else:
+                say("❌ Ошибка при снятии назначения")
+            return
+
+        # Извлекаем user ID из упоминания (@UXXXXXXX)
+        import re
+        user_mention_match = re.search(r'<@([UW][A-Z0-9]+)>', text)
+
+        if user_mention_match:
+            mentioned_user_id = user_mention_match.group(1)
+
+            if set_task_assignment(task_name, mentioned_user_id):
+                say(f"✅ Пользователь <@{mentioned_user_id}> назначен на задачу *{task_name}*")
+            else:
+                say("❌ Ошибка при назначении пользователя")
+        else:
+            say("❌ Не удалось найти упоминание пользователя. Используйте: `/set-fin-duty @username`")
+
+    except Exception as e:
+        logger.error(f"Error in handle_set_fin_duty: {e}")
+        say("❌ Произошла ошибка при обработке команды")
 
 if __name__ == "__main__":
     SocketModeHandler(app, Config.SLACK_APP_TOKEN).start()

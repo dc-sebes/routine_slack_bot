@@ -369,3 +369,61 @@ def format_employees_mention(employees: List[Dict[str, str]]) -> str:
             mentions.append(emp.get("name", "Unknown"))
 
     return "[" + " + ".join(mentions) + "]"
+
+def load_task_assignments() -> Dict[str, str]:
+    #Загрузить назначения пользователей на задачи из employees
+    try:
+        employees_data = load_employees()
+        # Назначения хранятся в специальном разделе employees
+        return employees_data.get("task_assignments", {})
+    except Exception as e:
+        logger.error(f"Error loading task assignments: {e}")
+        return {}
+
+def save_task_assignments(assignments: Dict[str, str]) -> bool:
+    #Сохранить назначения пользователей на задачи в employees
+    try:
+        employees_data = load_employees()
+        # Сохраняем назначения в специальном разделе
+        employees_data["task_assignments"] = assignments
+        return save_employees(employees_data)
+    except Exception as e:
+        logger.error(f"Error saving task assignments: {e}")
+        return False
+
+def set_task_assignment(task_name: str, user_id: str = None) -> bool:
+    #Назначить или снять пользователя с задачи
+    assignments = load_task_assignments()
+
+    # Нормализуем название задачи (приводим к верхнему регистру)
+    task_key = task_name.upper()
+
+    if user_id:
+        # Назначаем пользователя
+        assignments[task_key] = user_id
+        logger.info(f"User {user_id} assigned to task {task_name}")
+    else:
+        # Снимаем назначение
+        if task_key in assignments:
+            del assignments[task_key]
+            logger.info(f"Assignment removed from task {task_name}")
+
+    return save_task_assignments(assignments)
+
+def get_task_assignment(task_name: str) -> str:
+    #Получить назначенного пользователя для задачи
+    assignments = load_task_assignments()
+    task_key = task_name.upper()
+    return assignments.get(task_key, "")
+
+def find_task_by_pattern(pattern: str) -> str:
+    #Найти задачу по паттерну (например, fin-duty)
+    task_base = load_task_base()
+
+    pattern_lower = pattern.lower()
+    for task_id, task_data in task_base.items():
+        task_name = task_data.get("name", "").lower()
+        if pattern_lower in task_name:
+            return task_data.get("name", "")
+
+    return ""
