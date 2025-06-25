@@ -121,6 +121,8 @@ def get_tasks_for_day(day_name):
             task_with_id["id"] = task_id
             tasks.append(task_with_id)
 
+    return tasks
+
     # Сортируем по времени дедлайна
     tasks.sort(key=lambda x: x.get("deadline", "23:59"))
     return tasks
@@ -149,7 +151,7 @@ def format_task_line(task):
     return task_line
 
 def generate_message_from_redis(day_override=None, debug_mode=False):
-    #Генерировать сообщение для Slack на основе данных из Redis
+    #Генерировать сообщение для Slack на основе данных из Redis с группировкой
     today = datetime.datetime.now()
 
     if day_override:
@@ -166,12 +168,34 @@ def generate_message_from_redis(day_override=None, debug_mode=False):
     debug_prefix = "🔧 DEBUG: " if debug_mode else ""
     header = f"{debug_prefix}🎓 Routine tasks for *{date_str}*"
 
-    # Формируем список задач
-    if tasks:
-        task_lines = [format_task_line(task) for task in tasks]
-        return header + "\n\n" + "\n".join(task_lines)
-    else:
+    # Если нет задач
+    if not tasks:
         return header + "\n\n_Нет задач на сегодня_"
+
+    # Группируем задачи
+    grouped_tasks = group_tasks_by_period(tasks)
+
+    message_parts = [header]
+
+    # Сначала показываем задачи без группы
+    if grouped_tasks["ungrouped"]:
+        message_parts.append("")  # Пустая строка для отступа
+        for task in grouped_tasks["ungrouped"]:
+            message_parts.append(format_task_line(task))
+
+    # Потом утренние задачи
+    if grouped_tasks["morning"]:
+        message_parts.append("\n*Утро*:")
+        for task in grouped_tasks["morning"]:
+            message_parts.append(format_task_line(task))
+
+    # Потом вечерние задачи
+    if grouped_tasks["evening"]:
+        message_parts.append("\n*Вечер*:")
+        for task in grouped_tasks["evening"]:
+            message_parts.append(format_task_line(task))
+
+    return "\n".join(message_parts)
 
 def get_task_deadlines():
     #Получить дедлайны задач для проверки времени выполнения
@@ -236,3 +260,26 @@ def find_task_in_text(text):
         return normalized_name
 
     return None
+
+def group_tasks_by_period(tasks):
+    #Группировать задачи по периодам (утро/вечер)
+    groups = {
+        "ungrouped": [],  # Задачи без группы
+        "morning": [],    # Утренние задачи
+        "evening": []     # Вечерние задачи
+    }
+
+    for task in tasks:
+        period = task.get("period", "")
+        if period == "morning":
+            groups["morning"].append(task)
+        elif period == "evening":
+            groups["evening"].append(task)
+        else:
+            groups["ungrouped"].append(task)
+
+    # Сортируем задачи в каждой группе по времени дедлайна
+    for group_name in groups:
+        groups[group_name].sort(key=lambda x: x.get("deadline", "23:59"))
+
+    return groups

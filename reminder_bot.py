@@ -2,7 +2,7 @@ import os
 import datetime
 import pytz
 from slack_sdk import WebClient
-from redis_bot import get_tasks_for_day, get_completed_tasks, get_thread_ts
+from redis_bot import get_tasks_for_day, get_completed_tasks, get_thread_ts, group_tasks_by_period
 
 client = WebClient(token=os.environ.get("SLACK_BOT_TOKEN"))
 CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
@@ -65,6 +65,28 @@ def get_incomplete_tasks():
 
     return incomplete_tasks, overdue_tasks
 
+def format_reminder_task_line(task, is_overdue=False):
+    #Форматировать строку задачи для напоминания
+    name = task.get("name", "")
+    deadline = task.get("deadline", "")
+    period = task.get("period", "")
+
+    # Эмодзи для группы
+    period_emoji = ""
+    if period == "morning":
+        period_emoji = "🌅 "
+    elif period == "evening":
+        period_emoji = "🌙 "
+
+    if is_overdue and deadline:
+        line = f"• {period_emoji}*{name}* (дедлайн был в {deadline})"
+    else:
+        line = f"• {period_emoji}*{name}*"
+        if deadline:
+            line += f" (до {deadline})"
+
+    return line
+
 def format_reminder_message():
     #Форматировать сообщение-напоминание
     riga = pytz.timezone("Europe/Riga")
@@ -87,22 +109,30 @@ def format_reminder_message():
     # Просроченные задачи
     if overdue_tasks:
         message_parts.append("\n🚨 *ПРОСРОЧЕННЫЕ ЗАДАЧИ:*")
-        for task in overdue_tasks:
-            name = task.get("name", "")
-            deadline = task.get("deadline", "")
-            line = f"• *{name}* (дедлайн был в {deadline})"
-            message_parts.append(line)
+
+        # Группируем просроченные задачи
+        grouped_overdue = group_tasks_by_period(overdue_tasks)
+
+        for task in grouped_overdue["ungrouped"]:
+            message_parts.append(format_reminder_task_line(task, is_overdue=True))
+        for task in grouped_overdue["morning"]:
+            message_parts.append(format_reminder_task_line(task, is_overdue=True))
+        for task in grouped_overdue["evening"]:
+            message_parts.append(format_reminder_task_line(task, is_overdue=True))
 
     # Остальные невыполненные задачи
     if incomplete_tasks:
         message_parts.append("\n📋 *НЕВЫПОЛНЕННЫЕ ЗАДАЧИ:*")
-        for task in incomplete_tasks:
-            name = task.get("name", "")
-            deadline = task.get("deadline", "")
-            line = f"• *{name}*"
-            if deadline:
-                line += f" (до {deadline})"
-            message_parts.append(line)
+
+        # Группируем невыполненные задачи
+        grouped_incomplete = group_tasks_by_period(incomplete_tasks)
+
+        for task in grouped_incomplete["ungrouped"]:
+            message_parts.append(format_reminder_task_line(task))
+        for task in grouped_incomplete["morning"]:
+            message_parts.append(format_reminder_task_line(task))
+        for task in grouped_incomplete["evening"]:
+            message_parts.append(format_reminder_task_line(task))
 
     # Добавляем тег команды в конец
     message_parts.append(f"\n{TEAM_MENTION}")
