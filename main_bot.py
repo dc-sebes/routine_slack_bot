@@ -1,6 +1,7 @@
 import pytz
 import datetime
 import re
+import json
 from typing import Dict, Any, Optional
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
@@ -150,6 +151,7 @@ def handle_set_fin_duty(ack, command, say):
     ack()
 
     try:
+        logger.info(f"Full command object: {json.dumps(command, indent=2)}")
         user_id = command.get("user_id")
         text = command.get("text", "").strip()
 
