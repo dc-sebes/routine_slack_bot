@@ -141,9 +141,9 @@ def format_task_line(task):
     if assigned_user:
         # Если есть назначенный пользователь, добавляем его в начало
         if deadline:
-            task_line = f"- [ ] [<@{assigned_user}>] *{name}* до {deadline}"
+            task_line = f"- [<@{assigned_user}>] *{name}* до {deadline}"
         else:
-            task_line = f"- [ ] [<@{assigned_user}>] *{name}*"
+            task_line = f"- [<@{assigned_user}>] *{name}*"
     else:
         # Обычная строка без назначения
         if deadline:
