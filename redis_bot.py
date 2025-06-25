@@ -151,15 +151,18 @@ def format_task_line(task):
     return task_line
 
 def generate_message_from_redis(day_override=None, debug_mode=False):
-    #Генерировать сообщение для Slack на основе данных из Redis с группировкой
+    #Генерировать сообщение для Slack на основе данных из Redis с группировкой и сотрудниками
     today = datetime.datetime.now()
 
     if day_override:
         day_name = day_override.capitalize()
         date_str = today.strftime('%d %B') + f" ({day_name})"
+        # Для day_override используем текущую дату в формате dd/mm
+        current_date = today.strftime('%d/%m')
     else:
         day_name = today.strftime('%A')
         date_str = today.strftime('%d %B (%A)')
+        current_date = today.strftime('%d/%m')
 
     # Получаем задачи для дня
     tasks = get_tasks_for_day(day_name)
@@ -185,13 +188,29 @@ def generate_message_from_redis(day_override=None, debug_mode=False):
 
     # Потом утренние задачи
     if grouped_tasks["morning"]:
-        message_parts.append("\n*Утро*:")
+        # Получаем сотрудников для утренней смены
+        morning_employees = get_employees_for_date_and_period(current_date, "morning")
+        employees_mention = format_employees_mention(morning_employees)
+
+        if employees_mention:
+            message_parts.append(f"\n*Утро*:\n{employees_mention}")
+        else:
+            message_parts.append("\n*Утро*:")
+
         for task in grouped_tasks["morning"]:
             message_parts.append(format_task_line(task))
 
     # Потом вечерние задачи
     if grouped_tasks["evening"]:
-        message_parts.append("\n*Вечер*:")
+        # Получаем сотрудников для вечерней смены
+        evening_employees = get_employees_for_date_and_period(current_date, "evening")
+        employees_mention = format_employees_mention(evening_employees)
+
+        if employees_mention:
+            message_parts.append(f"\n*Вечер* _(делается после 15:00)_:\n{employees_mention}")
+        else:
+            message_parts.append("\n*Вечер*:")
+
         for task in grouped_tasks["evening"]:
             message_parts.append(format_task_line(task))
 
@@ -283,3 +302,70 @@ def group_tasks_by_period(tasks):
         groups[group_name].sort(key=lambda x: x.get("deadline", "23:59"))
 
     return groups
+
+#Employees
+
+def load_employees() -> Dict[str, Any]:
+    #Загрузить данные сотрудников из Redis
+    try:
+        data = r.get(Config.EMPLOYEES)
+        if data:
+            return json.loads(data)
+        logger.warning("Employee data is empty or not found")
+        return {}
+    except (redis.RedisError, json.JSONDecodeError) as e:
+        logger.error(f"Error loading employees: {e}")
+        return {}
+
+def save_employees(employees: Dict[str, Any]) -> bool:
+    #Сохранить данные сотрудников в Redis
+    try:
+        r.set(Config.EMPLOYEES, json.dumps(employees))
+        logger.debug("Employees data saved successfully")
+        return True
+    except (redis.RedisError, json.JSONEncodeError) as e:
+        logger.error(f"Error saving employees: {e}")
+        return False
+
+def get_employees_for_date_and_period(date_str: str, period: str) -> List[Dict[str, str]]:
+    #Получить сотрудников, работающих в указанную дату и период
+    employees = load_employees()
+    working_employees = []
+
+    for emp_id, emp_data in employees.items():
+        name = emp_data.get("name", "")
+        slack_id = emp_data.get("slack_id", "")
+
+        # Получаем даты работы для указанного периода
+        if period == "morning":
+            work_dates = emp_data.get("morning_dates", [])
+        elif period == "evening":
+            work_dates = emp_data.get("evening_dates", [])
+        else:
+            continue
+
+        # Проверяем, работает ли сотрудник в эту дату
+        if date_str in work_dates:
+            working_employees.append({
+                "name": name,
+                "slack_id": slack_id,
+                "employee_id": emp_id
+            })
+
+    return working_employees
+
+def format_employees_mention(employees: List[Dict[str, str]]) -> str:
+    #Форматировать упоминания сотрудников для Slack
+    if not employees:
+        return ""
+
+    mentions = []
+    for emp in employees:
+        slack_id = emp.get("slack_id", "")
+        if slack_id:
+            mentions.append(f"<@{slack_id}>")
+        else:
+            # Если нет slack_id, используем имя
+            mentions.append(emp.get("name", "Unknown"))
+
+    return "[" + " + ".join(mentions) + "]"

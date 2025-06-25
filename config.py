@@ -16,6 +16,7 @@ class Config:
     SLACK_ROUTINE_STATE: str = "slack_routine_state"
     DEBUG_ROUTINE_STATE: str = "debug_routine_state"
     TASK_BASE: str = "task_base"
+    EMPLOYEES: str = "employees"
 
     # Timezone
     TIMEZONE: str = "Europe/Riga"
