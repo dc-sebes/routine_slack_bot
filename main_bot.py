@@ -9,7 +9,7 @@ from config import Config
 from redis_bot import (
     set_thread_ts, record_task, get_thread_ts,
     generate_message_from_redis, get_task_deadlines, find_task_in_text,
-    set_task_assignment, find_task_by_pattern  # Новые функции
+    set_task_assignment, find_task_by_pattern, find_employee_by_username # Новые функции
 )
 
 # Setup logging and validate config
@@ -151,11 +151,12 @@ def handle_set_fin_duty(ack, command, say):
     ack()
 
     try:
-        logger.info(f"Full command object: {json.dumps(command, indent=2)}")
-        user_id = command.get("user_id")
+        user_name = command.get("user_name", "")  # username того, кто вызвал
         text = command.get("text", "").strip()
 
-        # Ищем задачу, содержащую "fin-duty" или "fin duty"
+        logger.info(f"set-fin-duty: user={user_name}, text='{text}'")
+
+        # Ищем задачу
         task_name = find_task_by_pattern("fin")
 
         if not task_name:
@@ -171,29 +172,19 @@ def handle_set_fin_duty(ack, command, say):
                 say("❌ Ошибка при снятии назначения")
             return
 
-        #Извлекаем user ID из упоминания (@UXXXXXXX)
-        user_mention_patterns = [
-            r'<@([UW][A-Z0-9]+)(?:\|[^>]+)?>', # <@U1234567890> или <@U1234567890|username>
-            r'@([UW][A-Z0-9]+)',              # @U1234567890
-            r'([UW][A-Z0-9]{8,})'             # просто U1234567890
-        ]
+        # Извлекаем username из текста
+        target_username = text.lstrip('@').strip()
 
-        mentioned_user_id = None
-        for pattern in user_mention_patterns:
-            match = re.search(pattern, text)
-            if match:
-                mentioned_user_id = match.group(1)
-                logger.info(f"Found user ID: {mentioned_user_id}")
-                break
+        # Ищем пользователя в нашей базе
+        slack_user_id = find_employee_by_username(target_username)
 
-        if mentioned_user_id:
-            if set_task_assignment(task_name, mentioned_user_id):
-                say(f"✅ Пользователь <@{mentioned_user_id}> назначен на задачу *{task_name}*")
+        if slack_user_id:
+            if set_task_assignment(task_name, slack_user_id):
+                say(f"✅ Пользователь <@{slack_user_id}> назначен на задачу *{task_name}*")
             else:
                 say("❌ Ошибка при назначении пользователя")
         else:
-            logger.warning(f"Could not parse user mention from: '{text}'")
-            say(f"❌ Не удалось найти упоминание пользователя в '{text}'. Используйте: `/set-fin-duty @username`")
+            say(f"❌ Сотрудник с username '{target_username}' не найден в базе")
 
     except Exception as e:
         logger.error(f"Error in handle_set_fin_duty: {e}")

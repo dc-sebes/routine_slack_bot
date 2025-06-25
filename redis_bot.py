@@ -427,3 +427,24 @@ def find_task_by_pattern(pattern: str) -> str:
             return task_data.get("name", "")
 
     return ""
+
+def find_employee_by_username(username: str) -> str:
+    #Найти slack_id сотрудника по username
+    employees = load_employees()
+
+    # Убираем @ если есть
+    clean_username = username.lstrip('@').strip()
+
+    for emp_id, emp_data in employees.items():
+        if emp_id == "task_assignments":
+            continue
+
+        emp_username = emp_data.get("username", "")
+
+        if emp_username == clean_username:
+            slack_id = emp_data.get("slack_id", "")
+            logger.info(f"Found employee {emp_data.get('name')} with slack_id {slack_id} for username {username}")
+            return slack_id
+
+    logger.warning(f"Employee not found for username: {username}")
+    return ""
